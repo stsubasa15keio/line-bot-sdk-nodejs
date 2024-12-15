@@ -1,53 +1,42 @@
-'use strict';
-
-const line = require('@line/bot-sdk');
 const express = require('express');
+const { middleware, Client } = require('@line/bot-sdk');
 
-// create LINE SDK config from env variables
+// チャネルアクセストークンとチャネルシークレットを直接コードに埋め込む
 const config = {
-  channelSecret: process.env.CHANNEL_SECRET,
+    channelAccessToken: 'EKMjYXnYFNwR0DTm4eYyaY0R9RhqchdVgc0hth9zxU5B97sphTXUumeBe5CSp91DYSYGm/LRVy9i0YXZ/Hzd/1aWX3h2qqnC+3vYGB+fl7DqlLd7Rf+s8MmAYM4OLJApnkBhOKvSjH54hcdfpoiPawdB04t89/1O/w1cDnyilFU=',
+    channelSecret: 'c89dcec5e58ec0f9ff32bf6363c0e836'
 };
 
-// create LINE SDK client
-const client = new line.messagingApi.MessagingApiClient({
-  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN
-});
-
-// create Express app
-// about Express itself: https://expressjs.com/
 const app = express();
+const client = new Client(config);
 
-// register a webhook handler with middleware
-// about the middleware, please refer to doc
-app.post('/callback', line.middleware(config), (req, res) => {
-  Promise
-    .all(req.body.events.map(handleEvent))
-    .then((result) => res.json(result))
-    .catch((err) => {
-      console.error(err);
-      res.status(500).end();
-    });
+// Webhookエンドポイント
+app.post('/webhook', middleware(config), (req, res) => {
+    console.log('Webhook called');
+    Promise
+        .all(req.body.events.map(handleEvent))
+        .then(() => res.status(200).end())
+        .catch((err) => {
+            console.error(`Error: ${err}`);
+            res.status(500).end();
+        });
 });
 
-// event handler
-function handleEvent(event) {
-  if (event.type !== 'message' || event.message.type !== 'text') {
-    // ignore non-text-message event
-    return Promise.resolve(null);
-  }
+// イベント処理
+async function handleEvent(event) {
+    console.log(`Event received: ${JSON.stringify(event)}`);
 
-  // create an echoing text message
-  const echo = { type: 'text', text: event.message.text };
+    if (event.type !== 'message' || event.message.type !== 'text') {
+        return Promise.resolve(null);
+    }
 
-  // use reply API
-  return client.replyMessage({
-    replyToken: event.replyToken,
-    messages: [echo],
-  });
+    const echo = { type: 'text', text: `You said: ${event.message.text}` };
+
+    return client.replyMessage(event.replyToken, echo);
 }
 
-// listen on port
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`listening on ${port}`);
+// サーバーの起動
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
